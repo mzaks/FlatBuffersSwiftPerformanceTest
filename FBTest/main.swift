@@ -286,24 +286,24 @@ private func decode_from_file(reader : FBFileReaderStruct, start : Int) -> Int
 
 
 
-private func functionalDecode(buffer : UnsafePointer<UInt8>, start : Int) -> Int{
+private func functionalDecode(buffer : UnsafePointer<UInt8>, count : Int, start : Int) -> Int{
     
     let fooBarContainerOffset = getFooBarContainerRootOffset(buffer)
     
     var sum:Int = start
     
-    sum = sum &+ Int(getLocationFrom(buffer, fooBarContainerOffset: fooBarContainerOffset).count)
+    sum = sum &+ Int(getLocationFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, count: count).count)
     
-    sum = sum &+ Int(getFrootFrom(buffer, fooBarContainerOffset: fooBarContainerOffset).rawValue)
-    sum = sum &+ (getInitializedFrom(buffer, fooBarContainerOffset: fooBarContainerOffset) ? 1 : 0)
+    sum = sum &+ Int(getFrootFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, count: count).rawValue)
+    sum = sum &+ (getInitializedFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, count: count) ? 1 : 0)
     
-    for i in 0..<getListCountFrom(buffer, fooBarContainerOffset: fooBarContainerOffset) {
-        let foobarOffset = getFooBarOffsetFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, listIndex: i)
-        sum = sum &+ Int(getNameFrom(buffer, fooBarOffset: foobarOffset).count)
-        sum = sum &+ Int(getPostfixFrom(buffer, fooBarOffset: foobarOffset))
-        sum = sum &+ Int(getRatingFrom(buffer, fooBarOffset: foobarOffset))
+    for i in 0..<getListCountFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, count: count) {
+        let foobarOffset = getFooBarOffsetFrom(buffer, fooBarContainerOffset: fooBarContainerOffset, listIndex: i, count: count)
+        sum = sum &+ Int(getNameFrom(buffer, fooBarOffset: foobarOffset, count: count).count)
+        sum = sum &+ Int(getPostfixFrom(buffer, fooBarOffset: foobarOffset, count: count))
+        sum = sum &+ Int(getRatingFrom(buffer, fooBarOffset: foobarOffset, count: count))
         
-        let bar = getSiblingFrom(buffer, fooBarOffset: foobarOffset)
+        let bar = getSiblingFrom(buffer, fooBarOffset: foobarOffset, count: count)
         
         sum = sum &+ Int(bar.ratio)
         sum = sum &+ Int(bar.size)
@@ -371,7 +371,7 @@ enum BenchmarkRunType {
     case decode_direct4_class
     case decode_direct4_struct
     case decode_functions
-    case decode_struct
+    case decode_unsafe_struct
     case decode_from_file
 }
 
@@ -442,7 +442,7 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
             }
         case .decode_functions:
             for i in 0..<Int(iterations) {
-                let result = functionalDecode(builder._dataStart, start: i)
+                let result = functionalDecode(builder._dataStart, count: builder._dataCount, start: i)
                 total = total + UInt64(result)
             }
         case .decode_direct1_class:
@@ -475,7 +475,7 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
                 let result = decode_direct4_struct(builder._dataStart, count:builder._dataCount, start: i)
                 total = total + UInt64(result)
             }
-        case .decode_struct:
+        case .decode_unsafe_struct:
             for i in 0..<Int(iterations) {
                 let result = decode_struct(builder._dataStart, start: i)
                 total = total + UInt64(result)
@@ -510,7 +510,7 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
 }
 
 func flatbench() {
-    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_functions, .decode_struct, /*.decode_from_file*/]
+    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_functions, .decode_unsafe_struct, /*.decode_from_file*/]
     
     var total = 0
     var subtotal = 0
