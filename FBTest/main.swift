@@ -23,14 +23,14 @@ import Foundation
 
 private let iterations : Int = 1000
 private let inner_loop_iterations : Int = 1000
-private let bufsize = 2048 * 2
+private let bufsize = 512
 private var encodedsize = 0
 
 
 private func createContainer() -> FooBarContainer
 {
     let veclen = 3
-    var foobars = ContiguousArray<FooBar?>.init(count: veclen, repeatedValue:nil)
+    var foobars = ContiguousArray<FooBar?>.init(repeating: nil, count: veclen)
     
     for i in 0..<veclen { // 0xABADCAFEABADCAFE will overflow in usage
         let ident : UInt64 = 0xABADCAFE + UInt64(i)
@@ -42,34 +42,31 @@ private func createContainer() -> FooBarContainer
     }
     
     let location = "http://google.com/flatbuffers/"
-    let foobarcontainer = FooBarContainer(list: foobars, initialized: true, fruit: Enum.Bananas, location: location)
+    let foobarcontainer = FooBarContainer(list: foobars, initialized: true, fruit: Enum.bananas, location: location)
     
     return foobarcontainer
 }
 
 var reader_struct : FBMemoryReaderStruct!
-private func decode_eager_struct(buffer : UnsafeBufferPointer<UInt8>) -> FooBarContainer
+private func decode_eager_struct(_ buffer : UnsafeRawPointer, count: Int) -> FooBarContainer
 {
     //if reader_struct == nil {
-        reader_struct = FBMemoryReaderStruct(buffer: buffer.baseAddress, count: buffer.count, cache: nil)
+        reader_struct = FBMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
     //}
     return FooBarContainer.fromReader(reader_struct)!
 }
 
 var reader_class : FBMemoryReaderClass!
-private func decode_eager_class(buffer : UnsafeBufferPointer<UInt8>) -> FooBarContainer
+private func decode_eager_class(_ buffer : UnsafeRawPointer, count: Int) -> FooBarContainer
 {
-    if reader_class == nil {
-        reader_class = FBMemoryReaderClass(buffer: buffer.baseAddress, count: buffer.count, cache: nil)
-    } else {
-        reader_class.buffer = buffer.baseAddress
-        reader_class.count = buffer.count
-    }
+    //if reader_class == nil {
+        reader_class = FBMemoryReaderClass(buffer: buffer, count: count, cache: nil)
+    //}
     
     return FooBarContainer.fromReader(reader_class)!
 }
 
-private func flatuse(foobarcontainer : FooBarContainer, start : Int) -> Int
+private func flatuse(_ foobarcontainer : FooBarContainer, start : Int) -> Int
 {
     var sum:Int = Int(start)
     sum = sum &+ Int(foobarcontainer.location!.utf8.count)
@@ -97,7 +94,7 @@ private func flatuse(foobarcontainer : FooBarContainer, start : Int) -> Int
     return sum
 }
 
-private func decode_direct1(buffer : UnsafePointer<UInt8>, count : Int, start : Int, withStruct : Bool) -> Int
+private func decode_direct1(_ buffer : UnsafeRawPointer, count : Int, start : Int, withStruct : Bool) -> Int
 {
     let reader : FBReader
     if withStruct {
@@ -132,7 +129,7 @@ private func decode_direct1(buffer : UnsafePointer<UInt8>, count : Int, start : 
     return sum
 }
 
-private func decode_direct2(buffer : UnsafePointer<UInt8>, count : Int, start : Int) -> Int
+private func decode_direct2(_ buffer : UnsafeRawPointer, count : Int, start : Int) -> Int
 {
     let reader = FBMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
     
@@ -163,7 +160,7 @@ private func decode_direct2(buffer : UnsafePointer<UInt8>, count : Int, start : 
     return sum
 }
 
-private func decode_direct3(start : Int) -> Int
+private func decode_direct3(_ start : Int) -> Int
 {
     var sum:Int = Int(start)
     let foobarcontainer = FooBarContainer.Direct3(reader_class)!
@@ -193,7 +190,7 @@ private func decode_direct3(start : Int) -> Int
 }
 
 //private func decode_direct4_struct(start : Int) -> Int
-private func decode_direct4_struct(buffer : UnsafePointer<UInt8>, count : Int, start : Int) -> Int
+private func decode_direct4_struct(_ buffer : UnsafeRawPointer, count : Int, start : Int) -> Int
 {
     var sum:Int = Int(start)
     let reader = FBMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
@@ -224,7 +221,7 @@ private func decode_direct4_struct(buffer : UnsafePointer<UInt8>, count : Int, s
     return sum
 }
 
-private func decode_direct4_class(start : Int) -> Int
+private func decode_direct4_class(_ start : Int) -> Int
 {
     var sum:Int = Int(start)
     let foobarcontainer = FooBarContainerDirect(reader_class)!
@@ -254,7 +251,7 @@ private func decode_direct4_class(start : Int) -> Int
     return sum
 }
 
-private func decode_from_file(reader : FBFileReaderStruct, start : Int) -> Int
+private func decode_from_file(_ reader : FBFileReaderStruct, start : Int) -> Int
 {
     var sum:Int = Int(start)
     let foobarcontainer = FooBarContainerDirect(reader)!
@@ -285,8 +282,8 @@ private func decode_from_file(reader : FBFileReaderStruct, start : Int) -> Int
 }
 
 
-
-private func functionalDecode(buffer : UnsafePointer<UInt8>, count : Int, start : Int) -> Int{
+/*
+private func functionalDecode(_ buffer : UnsafePointer<UInt8>, count : Int, start : Int) -> Int{
     
     let fooBarContainerOffset = getFooBarContainerRootOffset(buffer)
     
@@ -317,9 +314,10 @@ private func functionalDecode(buffer : UnsafePointer<UInt8>, count : Int, start 
     }
     
     return sum
-}
+}*/
 
-private func decode_struct(buffer : UnsafePointer<UInt8>, start : Int) -> Int
+/*
+private func decode_struct(_ buffer : UnsafePointer<UInt8>, start : Int) -> Int
 {
     var sum:Int = Int(start)
     let foobarcontainer = FooBarContainerStruct(buffer)
@@ -347,17 +345,18 @@ private func decode_struct(buffer : UnsafePointer<UInt8>, start : Int) -> Int
         sum = sum &+ Int(foo.prefix)
     }
     return sum
-}
+}*/
 
 
 // convenience formatter
 extension Double {
-    func string(fractionDigits:Int) -> String {
-        let formatter = NSNumberFormatter()
+    func string(_ fractionDigits:Int) -> String {
+        let formatter = NumberFormatter()
         formatter.minimumFractionDigits = fractionDigits
         formatter.maximumFractionDigits = fractionDigits
         formatter.minimumIntegerDigits = 1
-        return formatter.stringFromNumber(self) ?? "\(self)"
+        let number = NSNumber(floatLiteral: self)
+        return formatter.string(from: number) ?? "\(self)"
     }
 }
 
@@ -375,17 +374,16 @@ enum BenchmarkRunType {
     case decode_from_file
 }
 
-private func runbench(runType: BenchmarkRunType) -> (Int, Int)
+private func runbench(_ runType: BenchmarkRunType) -> (Int, Int)
 {
     var encode = 0.0
     var decode = 0.0
     var use = 0.0
     var total:UInt64 = 0
     var results : ContiguousArray<FooBarContainer> = []
-    let builder = FlatBufferBuilder(config: BinaryBuildConfig(initialCapacity: bufsize, uniqueStrings: false, uniqueTables: false, uniqueVTables: false, forceDefaults: false, fullMemoryAlignment: true))
+    let builder = FBBuilder(config: FBBuildConfig(initialCapacity: bufsize, uniqueStrings: false, uniqueTables: false, uniqueVTables: false, forceDefaults: false))
     
     results.reserveCapacity(Int(iterations))
-    FlatBufferBuilder.maxInstanceCacheSize = 10
     
     print("\(runType)")
     let container = createContainer()
@@ -401,13 +399,12 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
         let time2 = CFAbsoluteTimeGetCurrent()
         
         let p = builder._dataStart
-        let b = UnsafeBufferPointer(start: p, count: builder._dataCount)
-        var fileHandle : NSFileHandle? = nil
-        var fileUrl : NSURL? = nil
+        var fileHandle : FileHandle? = nil
+        var fileUrl : URL? = nil
         // Write to file
         if runType == .decode_from_file {
             let (fh, fu) = createTempFileHandle()
-            fh.writeData(NSData(bytes: b.baseAddress, length: b.count))
+            fh.write(Data(builder.data))
             
             fileHandle = fh
             fileUrl = fu
@@ -419,11 +416,11 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
         switch runType {
         case .decode_eager_class:
             for _ in 0..<iterations {
-                results.append(decode_eager_class(b))
+                results.append(decode_eager_class(p, count:encodedsize))
             }
         case .decode_eager_struct:
             for _ in 0..<iterations {
-                results.append(decode_eager_struct(b))
+                results.append(decode_eager_struct(p, count:encodedsize))
             }
         default: ()
         }
@@ -442,8 +439,8 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
             }
         case .decode_functions:
             for i in 0..<Int(iterations) {
-                let result = functionalDecode(builder._dataStart, count: builder._dataCount, start: i)
-                total = total + UInt64(result)
+                //let result = functionalDecode(builder._dataStart, count: builder._dataCount, start: i)
+                //total = total + UInt64(result)
             }
         case .decode_direct1_class:
             for i in 0..<Int(iterations) {
@@ -477,8 +474,8 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
             }
         case .decode_unsafe_struct:
             for i in 0..<Int(iterations) {
-                let result = decode_struct(builder._dataStart, start: i)
-                total = total + UInt64(result)
+                //let result = decode_struct(builder._dataStart, start: i)
+                //total = total + UInt64(result)
             }
         case .decode_from_file:
             for i in 0..<Int(iterations) {
@@ -491,7 +488,7 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
         let time6 = CFAbsoluteTimeGetCurrent()
         
         if let fileUrl = fileUrl {
-            try!NSFileManager.defaultManager().removeItemAtURL(fileUrl)
+            try!FileManager.default.removeItem(at: fileUrl)
         }
         
         encode = encode + (time2 - time1)
@@ -510,7 +507,7 @@ private func runbench(runType: BenchmarkRunType) -> (Int, Int)
 }
 
 func flatbench() {
-    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_functions, .decode_unsafe_struct, /*.decode_from_file*/]
+    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, /*.decode_functions, .decode_unsafe_struct, .decode_from_file*/]
     
     var total = 0
     var subtotal = 0
@@ -534,19 +531,19 @@ func flatbench() {
     print("")
 }
 
-func createTempFileHandle() -> (handle : NSFileHandle, url : NSURL){
+func createTempFileHandle() -> (handle : FileHandle, url : URL){
     // The template string:
-    let template = NSURL(fileURLWithPath: NSTemporaryDirectory()).URLByAppendingPathComponent("file.XXXXXX")
+    let template = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("file.XXXXXX")
     
     // Fill buffer with a C string representing the local file system path.
-    var buffer = [Int8](count: Int(PATH_MAX), repeatedValue: 0)
-    template!.getFileSystemRepresentation(&buffer, maxLength: buffer.count)
+    var buffer = [Int8](repeating: 0, count: Int(PATH_MAX))
+    (template as NSURL).getFileSystemRepresentation(&buffer, maxLength: buffer.count)
     
     // Create unique file name (and open file):
     let fd = mkstemp(&buffer)
-    let url = NSURL(fileURLWithFileSystemRepresentation: buffer, isDirectory: false, relativeToURL: nil)
+    let url = URL(fileURLWithFileSystemRepresentation: buffer, isDirectory: false, relativeTo: nil)
     //print(url.path!)
-    return (NSFileHandle(fileDescriptor: fd, closeOnDealloc: true), url)
+    return (FileHandle(fileDescriptor: fd, closeOnDealloc: true), url)
 }
 
 flatbench()

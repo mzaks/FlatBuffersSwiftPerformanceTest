@@ -16,7 +16,7 @@ public protocol FBReader {
 }
 
 
-enum FBReaderError : ErrorType {
+enum FBReaderError : Error {
     case OutOfBufferBounds
     case CanNotSetProperty
 }
@@ -24,40 +24,47 @@ enum FBReaderError : ErrorType {
 public class FBReaderCache {
     var objectPool : [Offset : AnyObject] = [:]
     func reset(){
-        objectPool.removeAll(keepCapacity: true)
+        objectPool.removeAll(keepingCapacity: true)
     }
 }
 
 public extension FBReader {
     
-    func getPropertyOffset(objectOffset : Offset, propertyIndex : Int) -> Int {
-        
+    private func getPropertyOffset(objectOffset : Offset, propertyIndex : Int) -> Int {
+        guard propertyIndex >= 0 else {
+            return 0
+        }
         do {
             let offset = Int(objectOffset)
-            let localOffset : Int32 = try fromByteArray(offset)
+            let localOffset : Int32 = try fromByteArray(position: offset)
             let vTableOffset : Int = offset - Int(localOffset)
-            let vTableLength : Int16 = try fromByteArray(vTableOffset)
-            if(vTableLength<=Int16(4 + propertyIndex * 2)) {
+            let vTableLength : Int16 = try fromByteArray(position: vTableOffset)
+            let objectLength : Int16 = try fromByteArray(position: vTableOffset + 2)
+            let positionInVTable = 4 + propertyIndex * 2
+            if(vTableLength<=Int16(positionInVTable)) {
                 return 0
             }
-            let propertyStart = vTableOffset + 4 + (2 * propertyIndex)
-            
-            let propertyOffset : Int16 = try fromByteArray(propertyStart)
+            let propertyStart = vTableOffset + positionInVTable
+            let propertyOffset : Int16 = try fromByteArray(position: propertyStart)
+            if(objectLength<=propertyOffset) {
+                return 0
+            }
             return Int(propertyOffset)
         } catch {
             return 0 // Currently don't want to propagate the error
         }
     }
     
-    func getOffset(objectOffset : Offset, propertyIndex : Int) -> Offset? {
+    public func getOffset(objectOffset : Offset, propertyIndex : Int) -> Offset? {
         
-        let propertyOffset = getPropertyOffset(objectOffset, propertyIndex: propertyIndex)
+        let propertyOffset = getPropertyOffset(objectOffset: objectOffset, propertyIndex: propertyIndex)
         if propertyOffset == 0 {
             return nil
         }
+        
         let position = objectOffset + propertyOffset
         do {
-            let localObjectOffset : Int32 = try fromByteArray(Int(position))
+            let localObjectOffset : Int32 = try fromByteArray(position: Int(position))
             let offset = position + localObjectOffset
             
             if localObjectOffset == 0 {
@@ -70,32 +77,32 @@ public extension FBReader {
         
     }
     
-    func getVectorLength(vectorOffset : Offset?) -> Int {
+    public func getVectorLength(vectorOffset : Offset?) -> Int {
         guard let vectorOffset = vectorOffset else {
             return 0
         }
         let vectorPosition = Int(vectorOffset)
         do {
-            let length2 : Int32 = try fromByteArray(vectorPosition)
+            let length2 : Int32 = try fromByteArray(position: vectorPosition)
             return Int(length2)
         } catch {
             return 0
         }
     }
     
-    func getVectorOffsetElement(vectorOffset : Offset?, index : Int) -> Offset? {
+    public func getVectorOffsetElement(vectorOffset : Offset?, index : Int) -> Offset? {
         guard let vectorOffset = vectorOffset else {
             return nil
         }
         guard index >= 0 else{
             return nil
         }
-        guard index < getVectorLength(vectorOffset) else {
+        guard index < getVectorLength(vectorOffset: vectorOffset) else {
             return nil
         }
-        let valueStartPosition = Int(vectorOffset + strideof(Int32) + (index * strideof(Int32)))
+        let valueStartPosition = Int(vectorOffset + MemoryLayout<Int32>.stride + (index * MemoryLayout<Int32>.stride))
         do {
-            let localOffset : Int32 = try fromByteArray(valueStartPosition)
+            let localOffset : Int32 = try fromByteArray(position: valueStartPosition)
             if(localOffset == 0){
                 return nil
             }
@@ -105,70 +112,70 @@ public extension FBReader {
         }
     }
     
-    func getVectorScalarElement<T : Scalar>(vectorOffset : Offset?, index : Int) -> T? {
+    public func getVectorScalarElement<T : Scalar>(vectorOffset : Offset?, index : Int) -> T? {
         guard let vectorOffset = vectorOffset else {
             return nil
         }
         guard index >= 0 else{
             return nil
         }
-        guard index < getVectorLength(vectorOffset) else {
+        guard index < getVectorLength(vectorOffset: vectorOffset) else {
             return nil
         }
         
-        let valueStartPosition = Int(vectorOffset + strideof(Int32) + (index * strideof(T)))
+        let valueStartPosition = Int(vectorOffset + MemoryLayout<Int32>.stride + (index * MemoryLayout<T>.stride))
         
         do {
-            return try fromByteArray(valueStartPosition) as T
+            return try fromByteArray(position: valueStartPosition) as T
         } catch {
             return nil
         }
     }
     
-    func get<T : Scalar>(objectOffset : Offset, propertyIndex : Int, defaultValue : T) -> T {
-        let propertyOffset = getPropertyOffset(objectOffset, propertyIndex: propertyIndex)
+    public func get<T : Scalar>(objectOffset : Offset, propertyIndex : Int, defaultValue : T) -> T {
+        let propertyOffset = getPropertyOffset(objectOffset: objectOffset, propertyIndex: propertyIndex)
         if propertyOffset == 0 {
             return defaultValue
         }
         let position = Int(objectOffset + propertyOffset)
         do {
-            return try fromByteArray(position)
+            return try fromByteArray(position: position)
         } catch {
             return defaultValue
         }
     }
     
-    func get<T : Scalar>(objectOffset : Offset, propertyIndex : Int) -> T? {
-        let propertyOffset = getPropertyOffset(objectOffset, propertyIndex: propertyIndex)
+    public func get<T : Scalar>(objectOffset : Offset, propertyIndex : Int) -> T? {
+        let propertyOffset = getPropertyOffset(objectOffset: objectOffset, propertyIndex: propertyIndex)
         if propertyOffset == 0 {
             return nil
         }
         let position = Int(objectOffset + propertyOffset)
         do {
-            return try fromByteArray(position) as T
+            return try fromByteArray(position: position) as T
         } catch {
             return nil
         }
     }
     
-    func getStringBuffer(stringOffset : Offset?) -> UnsafeBufferPointer<UInt8>? {
+    public func getStringBuffer(stringOffset : Offset?) -> UnsafeBufferPointer<UInt8>? {
         guard let stringOffset = stringOffset else {
             return nil
         }
         let stringPosition = Int(stringOffset)
         do {
-            let stringLength : Int32 = try fromByteArray(stringPosition)
-            let stringCharactersPosition = stringPosition + strideof(Int32)
+            let stringLength : Int32 = try fromByteArray(position: stringPosition)
+            let stringCharactersPosition = stringPosition + MemoryLayout<Int32>.stride
             
-            return try buffer(stringCharactersPosition, length: Int(stringLength))
+            return try buffer(position: stringCharactersPosition, length: Int(stringLength))
         } catch {
             return nil
         }
     }
     
-    var rootObjectOffset : Offset? {
+    public var rootObjectOffset : Offset? {
         do {
-            return try fromByteArray(0) as Offset
+            return try fromByteArray(position: 0) as Offset
         } catch {
             return nil
         }

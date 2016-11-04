@@ -26,8 +26,8 @@ extension UInt : Scalar {}
 extension Float32 : Scalar {}
 extension Float64 : Scalar {}
 
-postfix operator § {}
+postfix operator §
 
 public postfix func §(value: UnsafeBufferPointer<UInt8>) -> String? {
-    return String.init(bytesNoCopy: UnsafeMutablePointer<UInt8>(value.baseAddress), length: value.count, encoding: NSUTF8StringEncoding, freeWhenDone: false)
+    return String.init(bytesNoCopy: UnsafeMutablePointer<UInt8>(mutating: value.baseAddress!), length: value.count, encoding: String.Encoding.utf8, freeWhenDone: false)
 }

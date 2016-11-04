@@ -12,26 +12,37 @@ public struct FBMemoryReaderStruct : FBReader {
     
     private let count : Int
     public let cache : FBReaderCache?
-    private let buffer : UnsafePointer<UInt8>
+    private let buffer : UnsafeRawPointer
     
-    init(buffer : UnsafePointer<UInt8>, count : Int, cache : FBReaderCache? = FBReaderCache()) {
+    public init(buffer : UnsafeRawPointer, count : Int, cache : FBReaderCache? = FBReaderCache()) {
         self.buffer = buffer
         self.count = count
         self.cache = cache
     }
     
+    public init(data : Data, cache : FBReaderCache? = FBReaderCache()) {
+        self.count = data.count
+        self.cache = cache
+        var pointer : UnsafePointer<UInt8>! = nil
+        data.withUnsafeBytes { (u8Ptr: UnsafePointer<UInt8>) in
+            pointer = u8Ptr
+        }
+        self.buffer = UnsafeRawPointer(pointer)
+    }
+    
     public func fromByteArray<T : Scalar>(position : Int) throws -> T {
-        if position + strideof(T) >= count || position < 0 {
+        if position + MemoryLayout<T>.stride >= count || position < 0 {
             throw FBReaderError.OutOfBufferBounds
         }
-        return UnsafePointer<T>(buffer.advancedBy(position)).memory
+        
+        return buffer.load(fromByteOffset: position, as: T.self)
     }
     
     public func buffer(position : Int, length : Int) throws -> UnsafeBufferPointer<UInt8> {
         if Int(position + length) > count {
             throw FBReaderError.OutOfBufferBounds
         }
-        let pointer = UnsafePointer<UInt8>(buffer).advancedBy(position)
+        let pointer = buffer.advanced(by:position).bindMemory(to: UInt8.self, capacity: length)
         return UnsafeBufferPointer<UInt8>.init(start: pointer, count: Int(length))
     }
     
@@ -46,10 +57,10 @@ public struct FBMemoryReaderStruct : FBReader {
 public struct FBFileReaderStruct : FBReader {
     
     private let fileSize : UInt64
-    private let fileHandle : NSFileHandle
+    private let fileHandle : FileHandle
     public let cache : FBReaderCache?
     
-    init(fileHandle : NSFileHandle, cache : FBReaderCache? = FBReaderCache()){
+    public init(fileHandle : FileHandle, cache : FBReaderCache? = FBReaderCache()){
         self.fileHandle = fileHandle
         fileSize = fileHandle.seekToEndOfFile()
         
@@ -58,20 +69,32 @@ public struct FBFileReaderStruct : FBReader {
     
     public func fromByteArray<T : Scalar>(position : Int) throws -> T {
         let seekPosition = UInt64(position)
-        if seekPosition + UInt64(strideof(T)) >= fileSize {
+        if seekPosition + UInt64(MemoryLayout<T>.stride) >= fileSize {
             throw FBReaderError.OutOfBufferBounds
         }
-        fileHandle.seekToFileOffset(seekPosition)
-        return UnsafePointer<T>(fileHandle.readDataOfLength(strideof(T)).bytes).memory
+        fileHandle.seek(toFileOffset: seekPosition)
+        let data = fileHandle.readData(ofLength:MemoryLayout<T>.stride)
+        let pointer = UnsafeMutablePointer<T>.allocate(capacity: MemoryLayout<T>.stride)
+        let t : UnsafeMutableBufferPointer<T> = UnsafeMutableBufferPointer(start: pointer, count: 1)
+        _ = data.copyBytes(to: t)
+        if let result = t.baseAddress?.pointee {
+            pointer.deinitialize()
+            return result
+        }
+        throw FBReaderError.OutOfBufferBounds
     }
     
     public func buffer(position : Int, length : Int) throws -> UnsafeBufferPointer<UInt8> {
-        if UInt64(position + length) >= fileSize {
+        if UInt64(position + length) > fileSize {
             throw FBReaderError.OutOfBufferBounds
         }
-        fileHandle.seekToFileOffset(UInt64(position))
-        let pointer = UnsafeMutablePointer<UInt8>(fileHandle.readDataOfLength(Int(length)).bytes)
-        return UnsafeBufferPointer<UInt8>.init(start: pointer, count: Int(length))
+        fileHandle.seek(toFileOffset: UInt64(position))
+        let data = fileHandle.readData(ofLength:Int(length))
+        let pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+        let t : UnsafeMutableBufferPointer<UInt8> = UnsafeMutableBufferPointer(start: pointer, count: length)
+        _ = data.copyBytes(to: t)
+        pointer.deinitialize()
+        return UnsafeBufferPointer<UInt8>(start: t.baseAddress, count: length)
     }
     
     public func isEqual(other: FBReader) -> Bool{

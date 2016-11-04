@@ -9,7 +9,7 @@
 import Foundation
 
 public enum Enum : Int16 {
-    case Apples, Pears, Bananas
+    case apples, pears, bananas
 }
 
 public struct Foo : Scalar {
@@ -49,7 +49,7 @@ public final class FooBar {
 public final class FooBarContainer {
     public var list : ContiguousArray<FooBar?> = []
     public var initialized : Bool = false
-    public var fruit : Enum? = Enum.Apples
+    public var fruit : Enum? = Enum.apples
     public var location : String? = nil
     public init(){}
     public init(list: ContiguousArray<FooBar?>, initialized: Bool, fruit: Enum?, location: String?){
