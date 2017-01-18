@@ -10,19 +10,19 @@ import Foundation
 
 public extension FooBarContainer {
     public func toFlatBufferBuilder (_ builder : FBBuilder) throws -> Void {
-        let offset = addToByteArray(builder)
+        let offset = try addToByteArray(builder)
         try builder.finish(offset: offset, fileIdentifier: nil)
     }
 }
 
 public extension FooBarContainer {
-    fileprivate func addToByteArray(_ builder : FBBuilder) -> Offset {
+    fileprivate func addToByteArray(_ builder : FBBuilder) throws -> Offset {
         if builder.config.uniqueTables {
             if let myOffset = builder.cache[ObjectIdentifier(self)] {
                 return myOffset
             }
         }
-        let offset3 = try! builder.createString(value: location)
+        let offset3 = try builder.createString(value: location)
         var offset0 = Offset(0)
         if list.count > 0{
             var offsets = [Offset?](repeating: nil, count: list.count)
@@ -44,9 +44,9 @@ public extension FooBarContainer {
         try! builder.addPropertyToOpenObject(propertyIndex: 2, value : fruit!.rawValue, defaultValue : 0)
         try! builder.addPropertyToOpenObject(propertyIndex: 1, value : initialized, defaultValue : false)
         if list.count > 0 {
-            try! builder.addPropertyOffsetToOpenObject(propertyIndex: 0, offset: offset0)
+            try builder.addPropertyOffsetToOpenObject(propertyIndex: 0, offset: offset0)
         }
-        let myOffset =  try! builder.closeObject()
+        let myOffset =  try builder.closeObject()
         if builder.config.uniqueTables {
             builder.cache[ObjectIdentifier(self)] = myOffset
         }

@@ -181,3 +181,87 @@ public extension FBReader {
         }
     }
 }
+
+
+public protocol DirectAccess {
+    init?<R : FBReader>(reader: R, myOffset: Offset?)
+}
+struct FBTableVector<T: DirectAccess, R : FBReader> : Sequence {
+    fileprivate let reader : R
+    fileprivate let myOffset : Offset
+    fileprivate init(reader: R, myOffset: Offset){
+        self.reader = reader
+        self.myOffset = myOffset
+    }
+    public var count : Int { return reader.getVectorLength(vectorOffset: myOffset) }
+    
+    public subscript(i : Int) -> T? {
+        let offset = reader.getVectorOffsetElement(vectorOffset: myOffset, index: i)
+        return T(reader: reader, myOffset: offset)
+    }
+    
+    public func makeIterator() -> AnyIterator<T> {
+        var nextIndex = 0
+        return AnyIterator<T> {
+            if(self.count <= nextIndex){
+                return nil
+            }
+            let value = self[nextIndex]
+            nextIndex += 1
+            return value
+        }
+    }
+}
+
+struct FBScalarVector<T: Scalar, R : FBReader> : Sequence {
+    fileprivate let reader : R
+    fileprivate let myOffset : Offset
+    fileprivate init(reader: R, myOffset: Offset){
+        self.reader = reader
+        self.myOffset = myOffset
+    }
+    public var count : Int { return reader.getVectorLength(vectorOffset: myOffset) }
+    
+    public subscript(i : Int) -> T? {
+        return reader.getVectorScalarElement(vectorOffset: myOffset, index: i)
+    }
+    
+    public func makeIterator() -> AnyIterator<T> {
+        var nextIndex = 0
+        return AnyIterator<T> {
+            if(self.count <= nextIndex){
+                return nil
+            }
+            let value = self[nextIndex]
+            nextIndex += 1
+            return value
+        }
+    }
+}
+
+public struct FBVector<T> : Sequence {
+    private let _generator : (Int)->T?
+    private let _count : Int
+    init(count : Int, generator : @escaping (Int)->T?) {
+        _count = count
+        _generator = generator
+    }
+    
+    var count : Int { return _count }
+    
+    public subscript(i : Int) -> T? {
+        return _generator(i)
+    }
+    
+    public func makeIterator() -> AnyIterator<T> {
+        var nextIndex = 0
+        return AnyIterator<T> {
+            if(self.count <= nextIndex){
+                return nil
+            }
+            let value = self._generator(nextIndex)
+            nextIndex += 1
+            return value
+        }
+    }
+}

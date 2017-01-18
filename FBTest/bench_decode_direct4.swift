@@ -22,6 +22,19 @@ public struct FooBarContainerDirect<T : FBReader> : Hashable {
         }
         self.myOffset = offest
     }
+    
+    public var list : FBVector<FooBarDirect<T>> {
+        let offsetList = reader.getOffset(objectOffset: myOffset, propertyIndex: 0)
+        let _reader = reader
+        return FBVector(count: reader.getVectorLength(vectorOffset: reader.getOffset(objectOffset: myOffset, propertyIndex: 0)), generator: { index in
+            
+            if let ofs = _reader.getVectorOffsetElement(vectorOffset: offsetList, index: index) {
+                return FooBarDirect(reader: _reader, myOffset: ofs)
+            }
+            return nil
+        })
+    }
+    
     public var listCount : Int {
         return reader.getVectorLength(vectorOffset: reader.getOffset(objectOffset: myOffset, propertyIndex: 0))
     }
@@ -45,13 +58,17 @@ public func ==<T>(t1: FooBarContainerDirect<T>, t2: FooBarContainerDirect<T>) ->
     return t1.reader.isEqual(other: t2.reader) && t1.myOffset == t2.myOffset
 }
 
-public struct FooBarDirect<T: FBReader> : Hashable {
+public struct FooBarDirect<T: FBReader> : Hashable, DirectAccess {
     fileprivate let reader : T
     fileprivate let myOffset : Offset
-    init(reader: T, myOffset: Offset){
-        self.reader = reader
-        self.myOffset = myOffset
+    public init?<R : FBReader>(reader: R, myOffset: Offset?){
+        self.reader = reader as! T
+        self.myOffset = myOffset!
     }
+//    public init?(reader: T, myOffset: Offset?){
+//        self.reader = reader
+//        self.myOffset = myOffset!
+//    }
     public var sibling : Bar? {
         get { return reader.get(objectOffset: myOffset, propertyIndex: 0)}
     }
