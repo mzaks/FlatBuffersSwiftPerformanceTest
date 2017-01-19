@@ -267,15 +267,11 @@ public struct FBVector<T: DirectAccess, R : FBReader> : Collection {
     public func index(after i: Int) -> Int {
         return i+1
     }
-    public subscript(i : Int) -> T {
-            return T(reader: reader, myOffset: reader.getVectorOffsetElement(vectorOffset: myOffset, index: i))!
-    }
-    /*
+    
     public subscript(i : Int) -> T? {
         if let offset = reader.getVectorOffsetElement(vectorOffset: myOffset, index: i) {
             return T(reader: reader, myOffset: offset)
         }
         return nil
     }
- */
 }

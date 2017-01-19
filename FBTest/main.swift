@@ -234,11 +234,11 @@ private func decode_direct4_struct_with_vector(_ buffer : UnsafeRawPointer, coun
   
     if let list = foobarcontainer.list {
         for foobar in list {            
-            sum = sum &+ Int(foobar.name!.count)
-            sum = sum &+ Int(foobar.postfix)
-            sum = sum &+ Int(foobar.rating)
+            sum = sum &+ Int(foobar!.name!.count)
+            sum = sum &+ Int(foobar!.postfix)
+            sum = sum &+ Int(foobar!.rating)
             
-            let bar = foobar.sibling!
+            let bar = foobar!.sibling!
             
             sum = sum &+ Int(bar.ratio)
             sum = sum &+ Int(bar.size)
