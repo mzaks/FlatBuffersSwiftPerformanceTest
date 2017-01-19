@@ -22,19 +22,13 @@ public struct FooBarContainerDirect<T : FBReader> : Hashable {
         }
         self.myOffset = offest
     }
-    
-    public var list : FBVector<FooBarDirect<T>> {
-        let offsetList = reader.getOffset(objectOffset: myOffset, propertyIndex: 0)
-        let _reader = reader
-        return FBVector(count: reader.getVectorLength(vectorOffset: reader.getOffset(objectOffset: myOffset, propertyIndex: 0)), generator: { index in
-            
-            if let ofs = _reader.getVectorOffsetElement(vectorOffset: offsetList, index: index) {
-                return FooBarDirect(reader: _reader, myOffset: ofs)
-            }
-            return nil
-        })
-    }
-    
+
+    public var list : FBVector<FooBarDirect<T>, T>? {
+        if let offsetList = reader.getOffset(objectOffset: myOffset, propertyIndex: 0) {
+            return FBVector(count: reader.getVectorLength(vectorOffset: reader.getOffset(objectOffset: myOffset, propertyIndex: 0)), reader: self.reader, myOffset: offsetList)
+        }
+        return nil
+   }
     public var listCount : Int {
         return reader.getVectorLength(vectorOffset: reader.getOffset(objectOffset: myOffset, propertyIndex: 0))
     }
