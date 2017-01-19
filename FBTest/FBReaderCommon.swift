@@ -186,82 +186,96 @@ public extension FBReader {
 public protocol DirectAccess {
     init?<R : FBReader>(reader: R, myOffset: Offset?)
 }
-struct FBTableVector<T: DirectAccess, R : FBReader> : Sequence {
+struct FBTableVector<T: DirectAccess, R : FBReader> : Collection {
+    public let count : Int
+
     fileprivate let reader : R
     fileprivate let myOffset : Offset
-    fileprivate init(reader: R, myOffset: Offset){
+
+    public init(reader: R, myOffset: Offset){
         self.reader = reader
         self.myOffset = myOffset
+        self.count = reader.getVectorLength(vectorOffset: myOffset)
     }
-    public var count : Int { return reader.getVectorLength(vectorOffset: myOffset) }
+
+    public var startIndex: Int {
+        return 0
+    }
     
+    public var endIndex: Int {
+        return count
+    }
+
+    public func index(after i: Int) -> Int {
+        return i+1
+    }
+
     public subscript(i : Int) -> T? {
         let offset = reader.getVectorOffsetElement(vectorOffset: myOffset, index: i)
         return T(reader: reader, myOffset: offset)
     }
-    
-    public func makeIterator() -> AnyIterator<T> {
-        var nextIndex = 0
-        return AnyIterator<T> {
-            if(self.count <= nextIndex){
-                return nil
-            }
-            let value = self[nextIndex]
-            nextIndex += 1
-            return value
-        }
-    }
 }
 
-struct FBScalarVector<T: Scalar, R : FBReader> : Sequence {
+struct FBScalarVector<T: Scalar, R : FBReader> : Collection {
+    public let count : Int
+
     fileprivate let reader : R
     fileprivate let myOffset : Offset
     fileprivate init(reader: R, myOffset: Offset){
         self.reader = reader
         self.myOffset = myOffset
+        self.count = reader.getVectorLength(vectorOffset: myOffset)
     }
-    public var count : Int { return reader.getVectorLength(vectorOffset: myOffset) }
+
+    public var startIndex: Int {
+        return 0
+    }
     
+    public var endIndex: Int {
+        return count
+    }
+    
+    public func index(after i: Int) -> Int {
+        return i+1
+    }
+
     public subscript(i : Int) -> T? {
         return reader.getVectorScalarElement(vectorOffset: myOffset, index: i)
     }
-    
-    public func makeIterator() -> AnyIterator<T> {
-        var nextIndex = 0
-        return AnyIterator<T> {
-            if(self.count <= nextIndex){
-                return nil
-            }
-            let value = self[nextIndex]
-            nextIndex += 1
-            return value
-        }
-    }
 }
 
-public struct FBVector<T> : Sequence {
-    private let _generator : (Int)->T?
-    private let _count : Int
-    init(count : Int, generator : @escaping (Int)->T?) {
-        _count = count
-        _generator = generator
+public struct FBVector<T: DirectAccess, R : FBReader> : Collection {
+    public let count : Int
+    
+    fileprivate let reader : R
+    fileprivate let myOffset : Offset
+    
+    public init(count c: Int, reader: R, myOffset: Offset){
+        self.reader = reader
+        self.myOffset = myOffset
+        self.count = c
+    }
+
+    public var startIndex: Int {
+        return 0
     }
     
-    var count : Int { return _count }
+    public var endIndex: Int {
+        return count
+    }
     
+    public func index(after i: Int) -> Int {
+        return i+1
+    }
+    public subscript(i : Int) -> T {
+            return T(reader: reader, myOffset: reader.getVectorOffsetElement(vectorOffset: myOffset, index: i))!
+    }
+    /*
     public subscript(i : Int) -> T? {
-        return _generator(i)
-    }
-    
-    public func makeIterator() -> AnyIterator<T> {
-        var nextIndex = 0
-        return AnyIterator<T> {
-            if(self.count <= nextIndex){
-                return nil
-            }
-            let value = self._generator(nextIndex)
-            nextIndex += 1
-            return value
+        if let offset = reader.getVectorOffsetElement(vectorOffset: myOffset, index: i) {
+            return T(reader: reader, myOffset: offset)
         }
+        return nil
     }
+ */
 }

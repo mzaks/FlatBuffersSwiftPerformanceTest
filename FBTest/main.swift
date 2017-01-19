@@ -231,23 +231,25 @@ private func decode_direct4_struct_with_vector(_ buffer : UnsafeRawPointer, coun
     sum = sum &+ Int(foobarcontainer.location!.count)
     sum = sum &+ Int(foobarcontainer.fruit!.rawValue)
     sum = sum &+ (foobarcontainer.initialized ? 1 : 0)
-    
-    for foobar in foobarcontainer.list {
-        sum = sum &+ Int(foobar.name!.count)
-        sum = sum &+ Int(foobar.postfix)
-        sum = sum &+ Int(foobar.rating)
-        
-        let bar = foobar.sibling!
-        
-        sum = sum &+ Int(bar.ratio)
-        sum = sum &+ Int(bar.size)
-        sum = sum &+ Int(bar.time)
-        
-        let foo = bar.parent
-        sum = sum &+ Int(foo.count)
-        sum = sum &+ Int(foo.id)
-        sum = sum &+ Int(foo.length)
-        sum = sum &+ Int(foo.prefix)
+  
+    if let list = foobarcontainer.list {
+        for foobar in list {            
+            sum = sum &+ Int(foobar.name!.count)
+            sum = sum &+ Int(foobar.postfix)
+            sum = sum &+ Int(foobar.rating)
+            
+            let bar = foobar.sibling!
+            
+            sum = sum &+ Int(bar.ratio)
+            sum = sum &+ Int(bar.size)
+            sum = sum &+ Int(bar.time)
+            
+            let foo = bar.parent
+            sum = sum &+ Int(foo.count)
+            sum = sum &+ Int(foo.id)
+            sum = sum &+ Int(foo.length)
+            sum = sum &+ Int(foo.prefix)
+        }
     }
     return sum
 }
@@ -509,6 +511,7 @@ private func runbench(_ runType: BenchmarkRunType) -> (Int, Int)
                 let result = decode_direct4_struct_with_vector(builder._dataStart, count:builder._dataCount, start: i)
                 total = total + UInt64(result)
             }
+
         case .decode_unsafe_struct:
             for i in 0..<Int(iterations) {
                 //let result = decode_struct(builder._dataStart, start: i)
@@ -545,7 +548,9 @@ private func runbench(_ runType: BenchmarkRunType) -> (Int, Int)
 
 func flatbench() {
     let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_direct4_struct_with_vector, /*.decode_functions, .decode_unsafe_struct, .decode_from_file*/]
-    
+
+    //    let benchmarks : [BenchmarkRunType] = [.decode_direct4_struct, .decode_direct4_struct_with_vector]
+
     var total = 0
     var subtotal = 0
     var messageSize = 0
