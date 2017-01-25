@@ -31,11 +31,14 @@ public struct FBMemoryReaderStruct : FBReader {
     }
     
     public func fromByteArray<T : Scalar>(position : Int) throws -> T {
-        if position + MemoryLayout<T>.stride >= count || position < 0 {
+        
+        let stride = MemoryLayout<T>.stride
+        if position + stride >= count || position < 0 {
             throw FBReaderError.OutOfBufferBounds
         }
         
-        return buffer.load(fromByteOffset: position, as: T.self)
+        return buffer.advanced(by: position).assumingMemoryBound(to: T.self).pointee
+        
     }
     
     public func buffer(position : Int, length : Int) throws -> UnsafeBufferPointer<UInt8> {
