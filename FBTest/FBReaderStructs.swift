@@ -32,9 +32,13 @@ public struct FBMemoryReaderStruct : FBReader {
     
     public func fromByteArray<T : Scalar>(position : Int) throws -> T {
         
-        let stride = MemoryLayout<T>.stride
-        if position + stride >= count || position < 0 {
+        if position + MemoryLayout<T>.stride >= count || position < 0 {
             throw FBReaderError.OutOfBufferBounds
+        }
+        
+        guard 0 == (UInt(bitPattern: buffer + position)
+            & (UInt(MemoryLayout<T>.alignment) - 1)) else {
+            throw FBReaderError.DataNotAligned
         }
         
         return buffer.advanced(by: position).assumingMemoryBound(to: T.self).pointee
@@ -51,6 +55,48 @@ public struct FBMemoryReaderStruct : FBReader {
     
     public func isEqual(other: FBReader) -> Bool{
         guard let other = other as? FBMemoryReaderStruct else {
+            return false
+        }
+        return self.buffer == other.buffer
+    }
+}
+
+public struct FBUnsafeMemoryReaderStruct : FBReader {
+    
+    private let count : Int
+    public let cache : FBReaderCache?
+    private let buffer : UnsafeRawPointer
+    
+    public init(buffer : UnsafeRawPointer, count : Int, cache : FBReaderCache? = FBReaderCache()) {
+        self.buffer = buffer
+        self.count = count
+        self.cache = cache
+    }
+    
+    public init(data : Data, cache : FBReaderCache? = FBReaderCache()) {
+        self.count = data.count
+        self.cache = cache
+        var pointer : UnsafePointer<UInt8>! = nil
+        data.withUnsafeBytes { (u8Ptr: UnsafePointer<UInt8>) in
+            pointer = u8Ptr
+        }
+        self.buffer = UnsafeRawPointer(pointer)
+    }
+    
+    public func fromByteArray<T : Scalar>(position : Int) throws -> T {
+        return buffer.advanced(by: position).assumingMemoryBound(to: T.self).pointee
+    }
+    
+    public func buffer(position : Int, length : Int) throws -> UnsafeBufferPointer<UInt8> {
+        if Int(position + length) > count {
+            throw FBReaderError.OutOfBufferBounds
+        }
+        let pointer = buffer.advanced(by:position).bindMemory(to: UInt8.self, capacity: length)
+        return UnsafeBufferPointer<UInt8>.init(start: pointer, count: Int(length))
+    }
+    
+    public func isEqual(other: FBReader) -> Bool{
+        guard let other = other as? FBUnsafeMemoryReaderStruct else {
             return false
         }
         return self.buffer == other.buffer

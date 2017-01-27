@@ -254,6 +254,102 @@ private func decode_direct4_struct_with_vector(_ buffer : UnsafeRawPointer, coun
     return sum
 }
 
+private func decode_direct4_struct_with_vector_unsafe(_ buffer : UnsafeRawPointer, count : Int, start : Int) -> Int
+{
+    var sum:Int = Int(start)
+    let reader = FBUnsafeMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
+    let foobarcontainer = FooBarContainerDirect(reader)!
+    
+    sum = sum &+ Int(foobarcontainer.location!.count)
+    sum = sum &+ Int(foobarcontainer.fruit!.rawValue)
+    sum = sum &+ (foobarcontainer.initialized ? 1 : 0)
+    
+    if let list = foobarcontainer.list {
+        for foobar in list {
+            sum = sum &+ Int(foobar!.name!.count)
+            sum = sum &+ Int(foobar!.postfix)
+            sum = sum &+ Int(foobar!.rating)
+            
+            let bar = foobar!.sibling!
+            
+            sum = sum &+ Int(bar.ratio)
+            sum = sum &+ Int(bar.size)
+            sum = sum &+ Int(bar.time)
+            
+            let foo = bar.parent
+            sum = sum &+ Int(foo.count)
+            sum = sum &+ Int(foo.id)
+            sum = sum &+ Int(foo.length)
+            sum = sum &+ Int(foo.prefix)
+        }
+    }
+    return sum
+}
+
+private func decode_direct5(_ buffer : UnsafeRawPointer, count : Int, start : Int) -> Int
+{
+    var sum:Int = Int(start)
+    let reader = FBMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
+    let foobarcontainer = FooBarContainerDirect2(reader)!
+    
+    sum = sum &+ Int(foobarcontainer.location!.count)
+    sum = sum &+ Int(foobarcontainer.fruit!.rawValue)
+    sum = sum &+ (foobarcontainer.initialized ? 1 : 0)
+    
+    if let list = foobarcontainer.list {
+        for foobar in list {
+            sum = sum &+ Int(foobar!.name!.count)
+            sum = sum &+ Int(foobar!.postfix)
+            sum = sum &+ Int(foobar!.rating)
+            
+            let bar = foobar!.sibling!
+            
+            sum = sum &+ Int(bar.ratio)
+            sum = sum &+ Int(bar.size)
+            sum = sum &+ Int(bar.time)
+            
+            let foo = bar.parent
+            sum = sum &+ Int(foo.count)
+            sum = sum &+ Int(foo.id)
+            sum = sum &+ Int(foo.length)
+            sum = sum &+ Int(foo.prefix)
+        }
+    }
+    return sum
+}
+
+private func decode_direct5_unsafe(_ buffer : UnsafeRawPointer, count : Int, start : Int) -> Int
+{
+    var sum:Int = Int(start)
+    let reader = FBUnsafeMemoryReaderStruct(buffer: buffer, count: count, cache: nil)
+    let foobarcontainer = FooBarContainerDirect2(reader)!
+    
+    sum = sum &+ Int(foobarcontainer.location!.count)
+    sum = sum &+ Int(foobarcontainer.fruit!.rawValue)
+    sum = sum &+ (foobarcontainer.initialized ? 1 : 0)
+    
+    if let list = foobarcontainer.list {
+        for foobar in list {
+            sum = sum &+ Int(foobar!.name!.count)
+            sum = sum &+ Int(foobar!.postfix)
+            sum = sum &+ Int(foobar!.rating)
+            
+            let bar = foobar!.sibling!
+            
+            sum = sum &+ Int(bar.ratio)
+            sum = sum &+ Int(bar.size)
+            sum = sum &+ Int(bar.time)
+            
+            let foo = bar.parent
+            sum = sum &+ Int(foo.count)
+            sum = sum &+ Int(foo.id)
+            sum = sum &+ Int(foo.length)
+            sum = sum &+ Int(foo.prefix)
+        }
+    }
+    return sum
+}
+
 private func decode_direct4_class(_ start : Int) -> Int
 {
     var sum:Int = Int(start)
@@ -403,6 +499,9 @@ enum BenchmarkRunType {
     case decode_direct4_class
     case decode_direct4_struct
     case decode_direct4_struct_with_vector
+    case decode_direct4_struct_with_vector_unsafe
+    case decode_direct5
+    case decode_direct5_unsafe
     case decode_functions
     case decode_unsafe_struct
     case decode_from_file
@@ -511,7 +610,21 @@ private func runbench(_ runType: BenchmarkRunType) -> (Int, Int)
                 let result = decode_direct4_struct_with_vector(builder._dataStart, count:builder._dataCount, start: i)
                 total = total + UInt64(result)
             }
-
+        case .decode_direct4_struct_with_vector_unsafe:
+            for i in 0..<Int(iterations) {
+                let result = decode_direct4_struct_with_vector_unsafe(builder._dataStart, count:builder._dataCount, start: i)
+                total = total + UInt64(result)
+            }
+        case .decode_direct5:
+            for i in 0..<Int(iterations) {
+                let result = decode_direct5(builder._dataStart, count:builder._dataCount, start: i)
+                total = total + UInt64(result)
+            }
+        case .decode_direct5_unsafe:
+            for i in 0..<Int(iterations) {
+                let result = decode_direct5_unsafe(builder._dataStart, count:builder._dataCount, start: i)
+                total = total + UInt64(result)
+            }
         case .decode_unsafe_struct:
             for i in 0..<Int(iterations) {
                 //let result = decode_struct(builder._dataStart, start: i)
@@ -547,7 +660,7 @@ private func runbench(_ runType: BenchmarkRunType) -> (Int, Int)
 }
 
 func flatbench() {
-    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_direct4_struct_with_vector, /*.decode_functions, .decode_unsafe_struct, .decode_from_file*/]
+    let benchmarks : [BenchmarkRunType] = [.decode_eager_class, .decode_eager_struct, .decode_direct1_class, .decode_direct1_struct, .decode_direct2, .decode_direct3, .decode_direct4_class, .decode_direct4_struct, .decode_direct4_struct_with_vector, .decode_direct4_struct_with_vector_unsafe, .decode_direct5, .decode_direct5_unsafe, /*.decode_functions, .decode_unsafe_struct, .decode_from_file*/]
 
     //    let benchmarks : [BenchmarkRunType] = [.decode_direct4_struct, .decode_direct4_struct_with_vector]
 

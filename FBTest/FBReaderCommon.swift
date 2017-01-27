@@ -18,6 +18,7 @@ public protocol FBReader {
 
 enum FBReaderError : Error {
     case OutOfBufferBounds
+    case DataNotAligned
     case CanNotSetProperty
 }
 
@@ -29,6 +30,76 @@ public class FBReaderCache {
 }
 
 public extension FBReader {
+    
+    
+    public func vTableData(objectOffset : Offset) throws -> (localOffset: Int32, vTableLength : Int16, objectLength: Int16) {
+        
+        let localOffset : Int32 = try fromByteArray(position: Int(objectOffset))
+        let vTableOffset : Int = Int(objectOffset - localOffset)
+        let vTableLength : Int16 = try fromByteArray(position: vTableOffset)
+        let objectLength : Int16 = try fromByteArray(position: vTableOffset + 2)
+        
+        return (localOffset, vTableLength, objectLength)
+    }
+    
+    private func getPropertyOffset(objectOffset : Offset, propertyIndex : Int16, localOffset: Int32, vTableLength : Int16, objectLength: Int16) throws -> Int16 {
+        guard propertyIndex >= 0 else {
+            return 0
+        }
+        
+            let vTableOffset = objectOffset - localOffset
+
+            let positionInVTable = 4 + propertyIndex * 2
+            if(vTableLength<=positionInVTable) {
+                return 0
+            }
+            let propertyStart = Int(vTableOffset) + Int(positionInVTable)
+            let propertyOffset : Int16 = try fromByteArray(position: propertyStart)
+            if(objectLength <= propertyOffset) {
+                return 0
+            }
+            return propertyOffset
+        
+    }
+    
+    public func getOffset(objectOffset : Offset, propertyIndex : Int16, localOffset: Int32, vTableLength : Int16, objectLength: Int16) -> Offset? {
+        
+        do {
+            let propertyOffset = try getPropertyOffset(objectOffset: objectOffset, propertyIndex: propertyIndex, localOffset: localOffset, vTableLength : vTableLength, objectLength: objectLength)
+            if propertyOffset == 0 {
+                return nil
+            }
+            
+            let position = Int(objectOffset) + Int(propertyOffset)
+            
+            let localObjectOffset : Offset = try fromByteArray(position: Int(position))
+            let offset = position + localObjectOffset
+            
+            if localObjectOffset == 0 {
+                return nil
+            }
+            return offset
+        } catch {
+            return nil
+        }
+        
+    }
+    
+    public func get<T : Scalar>(objectOffset : Offset, propertyIndex : Int16, localOffset: Int32, vTableLength : Int16, objectLength: Int16) -> T? {
+        do {
+            let propertyOffset = try getPropertyOffset(objectOffset: objectOffset, propertyIndex: propertyIndex, localOffset: localOffset, vTableLength : vTableLength, objectLength: objectLength)
+            if propertyOffset == 0 {
+                return nil
+            }
+            let position = Int(objectOffset) + Int(propertyOffset)
+            return try fromByteArray(position: position) as T
+        } catch {
+            return nil
+        }
+    }
+    
+    ///MARK: -
+    
     
     private func getPropertyOffset(objectOffset : Offset, propertyIndex : Int) -> Int {
         guard propertyIndex >= 0 else {

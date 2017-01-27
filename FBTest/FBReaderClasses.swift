@@ -31,9 +31,12 @@ public final class FBMemoryReaderClass : FBReader {
     }
     
     public func fromByteArray<T : Scalar>(position : Int) throws -> T {
-        let stride = MemoryLayout<T>.stride
-        if position + stride >= count || position < 0 {
+        if position + MemoryLayout<T>.stride >= count || position < 0 {
             throw FBReaderError.OutOfBufferBounds
+        }
+        guard 0 == (UInt(bitPattern: buffer + position)
+            & (UInt(MemoryLayout<T>.alignment) - 1)) else {
+                throw FBReaderError.DataNotAligned
         }
         
         return buffer.advanced(by: position).assumingMemoryBound(to: T.self).pointee
